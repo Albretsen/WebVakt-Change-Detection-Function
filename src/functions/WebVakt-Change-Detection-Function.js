@@ -1,5 +1,6 @@
+// func host start --watch
 const { app } = require('@azure/functions');
-const compareContent = require('./services/webcompare')
+const compareWebContent = require('./services/webcompare');
 
 app.http('check', {
     methods: ['POST'],
@@ -8,9 +9,9 @@ app.http('check', {
         try {
             context.log(`Http function processed request for url "${request.url}"`);
 
-            const { target, selectors } = await request.json();
+            const { WebsiteURL, Monitors } = await request.json();
 
-            const differences = await detectChanges(target, selectors);
+            const differences = await detectChanges(WebsiteURL, Monitors);
 
             return { body: JSON.stringify(differences) };
         } catch (error) {
@@ -19,45 +20,29 @@ app.http('check', {
                     message: error.message,
                     stack: error.stack,
                 })
-            }
+            };
         }
     }
 });
 
 /**
- * Detects changes in web elements for a given URL based on an array of SelectorDetails.
+ * Detects changes in web elements for a given URL based on an array of Monitors.
  * 
  * @param {string} target - The URL of the target web page.
- * @param {Array<SelectorDetail>} selectorDetails - Configuration array containing detailed selector information.
+ * @param {Array<Monitor>} monitors - Array containing monitor details.
  * @returns {Promise<Array>} - An array of change objects with details for each detected change.
  */
-async function detectChanges(target, selectorDetails) {
-    const detectedChanges = await compareContent(target, selectorDetails);
+async function detectChanges(WebsiteURL, monitors) {
+    const detectedChanges = await compareWebContent(WebsiteURL, monitors);
 
     const currentTime = new Date().toISOString();
     return detectedChanges.map((change) => ({
-        SelectorID: selectorDetails.find(sd => sd.selector === change.selector).SelectorID,
-        Original: change.changes.expected,
-        Current: change.changes.current,
-        DetectedChange: `Change detected in ${change.selector}`,
-        Timestamp: currentTime
+        MonitorID: change.MonitorID,
+        WebsiteID: change.WebsiteID,
+        UserID: change.UserID,
+        SelectorString: change.Selector,
+        Attribute: change.Type,
+        SnapshotValue: change.Value,
+        LastCheckDate: currentTime
     }));
 }
-
-// [{
-//     "SelectorID": 1,
-//     "WebsiteID": 1,
-//     "UserID": 1,
-//     "SelectorString": "body > center > table > tbody > tr:nth-child(1) > td:nth-child(1) > ul > li > a",
-//     "Attribute": "textContent",
-//     "SnapshotValue": "A Message from Warren E. Buffett",
-//     "LastCheckDate": "2023-01-01",
-// }, {
-//     "SelectorID": 2,
-//     "WebsiteID": 1,
-//     "UserID": 1,
-//     "SelectorString": "body > center > table > tbody > tr:nth-child(1) > td:nth-child(1) > ul > li > a",
-//     "Attribute": "href",
-//     "SnapshotValue": "https://www.berkshirehathaway.com/message.html",
-//     "LastCheckDate": "2023-01-01",
-// }]

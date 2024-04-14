@@ -25,94 +25,118 @@
  * Copyright (c) Asgeir Albretsen, 2023
  */
 
-
 /**
- * Represents a selector with its comparison details.
+ * Represents a monitor with its comparison details.
  * 
- * @typedef {Object} SelectorDetail
- * @property {string} selector - The CSS selector for the element.
- * @property {string} comparisonType - The type of comparison ('text', 'attribute', 'style', 'children', 'custom').
- * @property {Array<string>} attributes - The list of attributes to compare, relevant if comparisonType is 'attribute'.
- * @property {*} snapshotValue - The expected value for the comparison.
+ * @typedef {Object} Monitor
+ * @property {number} MonitorID - The ID of the monitor.
+ * @property {string} Selector - The CSS selector for the element.
+ * @property {string} Type - The type of comparison ('text', 'attribute', 'style', 'children', 'custom').
+ * @property {Array<string>} Attributes - The list of attributes to compare, relevant if Type is 'attribute'.
+ * @property {*} Value - The expected value for the comparison.
  */
 
 const puppeteer = require('puppeteer');
 
 /**
- * Fetches details of a web element based on the provided SelectorDetail.
- * 
- * @param {object} page - The Puppeteer page instance.
- * @param {SelectorDetail} selectorDetail - The detailed information for selector and comparison.
- * @returns {Promise<object>} - An object containing the fetched element details.
+ * Launches a Puppeteer browser and navigates to the specified URL.
+ * @param {string} url - The URL to navigate to.
+ * @returns {Promise<object>} - The Puppeteer page instance.
  */
-async function fetchElementDetails(page, selectorDetail) {
-    return page.evaluate(({ selector, comparisonType, attributes }) => {
-        const element = document.querySelector(selector);
-        if (!element) return {};
-
-        let details = {};
-        switch (comparisonType) {
-            case 'text':
-                details['text'] = element.textContent || null;
-                break;
-            case 'attribute':
-                attributes.forEach(attr => {
-                    let attrValue = element.getAttribute(attr);
-                    if (attr === 'href' && attrValue) {
-                        const anchor = document.createElement('a');
-                        anchor.href = attrValue;  // Converts to absolute URL
-                        attrValue = anchor.href;
-                    }
-                    details[attr] = attrValue;
-                });
-                break;
-            case 'style':
-                const computedStyle = window.getComputedStyle(element);
-                details['style'] = Array.from(computedStyle).reduce((acc, propName) => {
-                    acc[propName] = computedStyle[propName];
-                    return acc;
-                }, {});
-                break;
-            case 'children':
-                details['children'] = Array.from(element.children).map(child => child.outerHTML).join('');
-                break;
-            case 'custom':
-                details['custom'] = {}; // Placeholder for custom logic
-                break;
-        }
-        return details;
-    }, selectorDetail);
-}
-
-/**
- * Compares web content against provided snapshot values using specified SelectorDetails.
- * 
- * @param {string} url - The URL of the web page to check.
- * @param {Array<SelectorDetail>} selectorDetails - An array of SelectorDetail objects for comparison.
- * @returns {Promise<Array>} - An array of objects detailing detected changes.
- */
-async function compareContent(url, selectorDetails) {
+async function navigateToPage(url) {
     const browser = await puppeteer.launch();
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: 'networkidle0' });
+    return { page, browser };
+}
 
-    const comparisons = await Promise.all(selectorDetails.map(async (selectorDetail) => {
-        const details = await fetchElementDetails(page, selectorDetail);
+/**
+ * Fetches details of a web element based on the provided monitor detail.
+ * @param {object} page - The Puppeteer page instance.
+ * @param {object} monitor - Detailed information for the monitor and comparison type.
+ * @returns {Promise<object>} - An object containing the fetched element details.
+ */
+async function getElementDetails(page, monitor) {
+    const { Selector, Type, Attributes } = monitor;
+    return page.evaluate(({ Selector, Type, Attributes }) => {
+        const evaluateElement = ({ element, Type, Attributes }) => {
+            switch (Type) {
+                case 'text':
+                    return element.textContent || null;
+                case 'attribute':
+                    let attributesDetails = {};
+                    Attributes.forEach(attr => {
+                        let attrValue = element.getAttribute(attr);
+                        if (attr === 'href' && attrValue) {
+                            const anchor = document.createElement('a');
+                            anchor.href = attrValue; // Converts to absolute URL
+                            attrValue = anchor.href;
+                        }
+                        attributesDetails[attr] = attrValue;
+                    });
+                    return attributesDetails;
+                case 'style':
+                    const computedStyle = window.getComputedStyle(element);
+                    return {
+                        style: Array.from(computedStyle).reduce((acc, propName) => {
+                            acc[propName] = computedStyle[propName];
+                            return acc;
+                        }, {})
+                    };
+                case 'children':
+                    return {
+                        children: Array.from(element.children).map(child => child.outerHTML).join('')
+                    };
+                case 'custom':
+                    // Custom logic should be implemented here based on the specific requirements.
+                    return {
+                        custom: {} // Placeholder for custom logic
+                    };
+                default:
+                    return {};
+            }
+        };
 
-        if (JSON.stringify(details) !== JSON.stringify(selectorDetail.snapshotValue)) {
+        const element = document.querySelector(Selector);
+        if (!element) {
+            return Type === 'text' ? null : {};
+        }
+        return evaluateElement({ element, Type, Attributes });
+    }, { Selector, Type, Attributes });
+}
+
+/**
+ * Compares web content against provided snapshot values using specified monitor details.
+ * @param {string} url - The URL of the web page to check.
+ * @param {Array<object>} monitors - An array of objects for comparison.
+ * @returns {Promise<Array>} - An array of objects detailing detected changes.
+ */
+async function compareWebContent(url, monitors) {
+    const { page, browser } = await navigateToPage(url);
+
+    const comparisons = await Promise.all(monitors.map(async (monitor) => {
+        const currentDetails = await getElementDetails(page, monitor);
+
+        if (JSON.stringify(currentDetails) !== JSON.stringify(monitor.Value)) {
             return {
-                url,
-                selector: selectorDetail.selector,
+                MonitorID: monitor.MonitorID,
+                WebsiteID: monitor.WebsiteID,
+                UserID: monitor.UserID,
+                Selector: monitor.Selector,
+                Type: monitor.Type,
+                Attributes: monitor.Attributes,
+                SnapshotID: monitor.SnapshotID,
+                Value: monitor.Value,
                 changes: {
-                    current: details,
-                    expected: selectorDetail.snapshotValue
+                    current: currentDetails,
+                    expected: monitor.Value
                 }
             };
         }
     }));
 
     await browser.close();
-    return comparisons.filter(comp => comp !== undefined);
+    return comparisons.filter(change => change !== undefined);
 }
 
-module.exports = compareContent;
+module.exports = compareWebContent;
