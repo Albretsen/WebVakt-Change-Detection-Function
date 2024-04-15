@@ -51,28 +51,22 @@ async function navigateToPage(url) {
 }
 
 /**
- * Fetches details of a web element based on the provided monitor detail.
+ * Fetches details of a web element based on the provided comparison details.
  * @param {object} page - The Puppeteer page instance.
- * @param {object} monitor - Detailed information for the monitor and comparison type.
+ * @param {object} comparisonDetails - Detailed information for the comparison.
  * @returns {Promise<object>} - An object containing the fetched element details.
  */
-async function getElementDetails(page, monitor) {
-    const { Selector, Type, Attributes } = monitor;
+async function getElementDetails(page, comparisonDetails) {
+    const { Selector, Type, Attributes } = comparisonDetails;
     return page.evaluate(({ Selector, Type, Attributes }) => {
         const evaluateElement = ({ element, Type, Attributes }) => {
             switch (Type) {
                 case 'text':
                     return element.textContent || null;
                 case 'attribute':
-                    let attributesDetails = {};
+                    const attributesDetails = {};
                     Attributes.forEach(attr => {
-                        let attrValue = element.getAttribute(attr);
-                        if (attr === 'href' && attrValue) {
-                            const anchor = document.createElement('a');
-                            anchor.href = attrValue; // Converts to absolute URL
-                            attrValue = anchor.href;
-                        }
-                        attributesDetails[attr] = attrValue;
+                        attributesDetails[attr] = element.getAttribute(attr);
                     });
                     return attributesDetails;
                 case 'style':
@@ -88,9 +82,9 @@ async function getElementDetails(page, monitor) {
                         children: Array.from(element.children).map(child => child.outerHTML).join('')
                     };
                 case 'custom':
-                    // Custom logic should be implemented here based on the specific requirements.
+                    // Placeholder for custom comparison logic
                     return {
-                        custom: {} // Placeholder for custom logic
+                        custom: {}
                     };
                 default:
                     return {};
@@ -99,44 +93,38 @@ async function getElementDetails(page, monitor) {
 
         const element = document.querySelector(Selector);
         if (!element) {
-            return Type === 'text' ? null : {};
+            return {};
         }
         return evaluateElement({ element, Type, Attributes });
     }, { Selector, Type, Attributes });
 }
 
 /**
- * Compares web content against provided snapshot values using specified monitor details.
+ * Compares web content against provided snapshot values using specified comparison details.
  * @param {string} url - The URL of the web page to check.
- * @param {Array<object>} monitors - An array of objects for comparison.
+ * @param {Array<object>} comparisons - An array of objects for comparison.
  * @returns {Promise<Array>} - An array of objects detailing detected changes.
  */
-async function compareWebContent(url, monitors) {
+async function compareWebContent(url, comparisons) {
     const { page, browser } = await navigateToPage(url);
 
-    const comparisons = await Promise.all(monitors.map(async (monitor) => {
-        const currentDetails = await getElementDetails(page, monitor);
+    const results = await Promise.all(comparisons.map(async (comparison) => {
+        const currentDetails = await getElementDetails(page, comparison);
 
-        if (JSON.stringify(currentDetails) !== JSON.stringify(monitor.Value)) {
+        if (JSON.stringify(currentDetails) !== JSON.stringify(comparison.Value)) {
             return {
-                MonitorID: monitor.MonitorID,
-                WebsiteID: monitor.WebsiteID,
-                UserID: monitor.UserID,
-                Selector: monitor.Selector,
-                Type: monitor.Type,
-                Attributes: monitor.Attributes,
-                SnapshotID: monitor.SnapshotID,
-                Value: monitor.Value,
-                changes: {
-                    current: currentDetails,
-                    expected: monitor.Value
-                }
+                ...comparison,
+                Selector: comparison.Selector,
+                Type: comparison.Type,
+                Attributes: comparison.Attributes,
+                ExpectedValue: comparison.Value,
+                CurrentValue: currentDetails,
             };
         }
     }));
 
     await browser.close();
-    return comparisons.filter(change => change !== undefined);
+    return results.filter(result => result !== undefined);
 }
 
 module.exports = compareWebContent;

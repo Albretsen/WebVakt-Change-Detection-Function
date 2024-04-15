@@ -7,42 +7,36 @@ app.http('check', {
     authLevel: 'anonymous',
     handler: async (request, context) => {
         try {
-            context.log(`Http function processed request for url "${request.url}"`);
+            context.log(`HTTP function processed request for URL "${request.url}"`);
 
             const { WebsiteURL, Monitors } = await request.json();
 
-            const differences = await detectChanges(WebsiteURL, Monitors);
+            const preparedMonitors = Monitors.map(monitor => ({
+                Selector: monitor.Selector,
+                Type: monitor.Type,
+                Attributes: monitor.Attributes || [],
+                Value: monitor.ExpectedValue,
+                MonitorID: monitor.MonitorID,
+                SnapshotID: monitor.SnapshotID
+            }));
 
-            return { body: JSON.stringify(differences) };
+            const changesDetected = await compareWebContent(WebsiteURL, preparedMonitors);
+
+            return {
+                body: JSON.stringify({
+                    message: "Changes detected successfully.",
+                    changes: changesDetected
+                })
+            };
         } catch (error) {
+            context.log(`Error: ${error.message}`);
             return {
                 body: JSON.stringify({
                     message: error.message,
                     stack: error.stack,
-                })
+                }),
+                status: 500
             };
         }
     }
 });
-
-/**
- * Detects changes in web elements for a given URL based on an array of Monitors.
- * 
- * @param {string} target - The URL of the target web page.
- * @param {Array<Monitor>} monitors - Array containing monitor details.
- * @returns {Promise<Array>} - An array of change objects with details for each detected change.
- */
-async function detectChanges(WebsiteURL, monitors) {
-    const detectedChanges = await compareWebContent(WebsiteURL, monitors);
-
-    const currentTime = new Date().toISOString();
-    return detectedChanges.map((change) => ({
-        MonitorID: change.MonitorID,
-        WebsiteID: change.WebsiteID,
-        UserID: change.UserID,
-        SelectorString: change.Selector,
-        Attribute: change.Type,
-        SnapshotValue: change.Value,
-        LastCheckDate: currentTime
-    }));
-}
