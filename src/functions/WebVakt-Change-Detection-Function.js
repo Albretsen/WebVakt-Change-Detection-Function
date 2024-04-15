@@ -7,20 +7,11 @@ app.http('check', {
     authLevel: 'anonymous',
     handler: async (request, context) => {
         try {
-            context.log(`HTTP function processed request for URL "${request.url}"`);
+          context.log(`HTTP function processed request for URL "${request.url}"`);
 
             const { WebsiteURL, Monitors } = await request.json();
 
-            const preparedMonitors = Monitors.map(monitor => ({
-                Selector: monitor.Selector,
-                Type: monitor.Type,
-                Attributes: monitor.Attributes || [],
-                Value: monitor.ExpectedValue,
-                MonitorID: monitor.MonitorID,
-                SnapshotID: monitor.SnapshotID
-            }));
-
-            const changesDetected = await compareWebContent(WebsiteURL, preparedMonitors);
+            const changesDetected = await compareWebContent(WebsiteURL, Monitors);
 
             return {
                 body: JSON.stringify({
