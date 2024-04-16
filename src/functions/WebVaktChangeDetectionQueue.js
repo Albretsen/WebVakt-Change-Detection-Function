@@ -15,7 +15,10 @@ app.storageQueue('checkQueueTrigger', {
                 parsedMessage = JSON.parse(message);
             }
 
-            context.log(`Queue trigger function processed snapshot: ${JSON.stringify(parsedMessage.SnapshotID)}`);
+            context.log(`Queue trigger function processed snapshot JSON.stringify(parsedMessage): ${message}`);
+            context.log(`Queue trigger function processed snapshot JSON.stringify(parsedMessage): ${JSON.stringify(parsedMessage)}`);
+            context.log(`Queue trigger function processed snapshot parsedMessage: ${parsedMessage}`);
+            context.log(`Queue trigger function processed snapshot JSON.stringify(parsedMessage.SnapshotID): ${JSON.stringify(parsedMessage.SnapshotID)}`);
             const { WebsiteURL, Monitors } = parsedMessage;
             const changesDetected = await compareWebContent(WebsiteURL, Monitors);
 
