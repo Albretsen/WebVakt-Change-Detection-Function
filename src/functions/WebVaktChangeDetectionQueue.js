@@ -1,5 +1,5 @@
 const { app } = require('@azure/functions');
-const compareWebContent = require('./services/webcompare');
+const compareWebContent = require('./webcompare');
 
 const externalServerURL = 'https://webvakt-app-service.azurewebsites.net/api/task';
 

@@ -36,7 +36,7 @@
  * @property {*} Value - The expected value for the comparison.
  */
 
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
 
 /**
  * Launches a Puppeteer browser and navigates to the specified URL.
@@ -44,7 +44,7 @@ const puppeteer = require('puppeteer');
  * @returns {Promise<object>} - The Puppeteer page instance.
  */
 async function navigateToPage(url) {
-    const browser = await puppeteer.launch();
+    const browser = await puppeteer.launch({headless: true, executablePath: "./chrome-linux/chrome"});
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: 'networkidle0' });
     return { page, browser };
