@@ -2,7 +2,7 @@
 const { app } = require('@azure/functions');
 const compareWebContent = require('./services/webcompare');
 
-const externalServerURL = 'https://localhost:32774/api/task';
+const externalServerURL = 'https://webvakt-app-service.azurewebsites.net/api/task';
 
 app.http('check', {
     methods: ['POST'],
