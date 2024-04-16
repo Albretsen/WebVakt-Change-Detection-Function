@@ -10,9 +10,7 @@ app.storageQueue('checkQueueTrigger', {
         try {
             process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-            // Assume message might already be an object
             let parsedMessage = message;
-            // If message is a string, try to parse it as JSON
             if (typeof message === 'string') {
                 parsedMessage = JSON.parse(message);
             }
@@ -42,8 +40,6 @@ app.storageQueue('checkQueueTrigger', {
                 context.log(`External server error: Status ${externalResponse.status}`);
                 throw new Error(`External server error: Status ${externalResponse.status}`);
             }
-
-            context.log(`External server responded with OK.`);
         } catch (error) {
             context.log(`Error: ${error.message}`);
             throw error; 
