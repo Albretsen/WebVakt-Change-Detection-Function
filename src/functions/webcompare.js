@@ -44,7 +44,7 @@ const puppeteer = require('puppeteer-core');
  * @returns {Promise<object>} - The Puppeteer page instance.
  */
 async function navigateToPage(url) {
-    const browser = await puppeteer.launch({headless: true, executablePath: "./chrome-linux/chrome"});
+    const browser = await puppeteer.launch({headless: true, executablePath: "./chrome-linux/chrome"}, args: ['--no-sandbox', '--disable-setuid-sandbox']);
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: 'networkidle0' });
     return { page, browser };
